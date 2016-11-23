@@ -101,10 +101,10 @@ int main (int argc, char** argv) {
     }
     N1 = atoi(argv[1]);
     N2 = atoi(argv[2]);
-    h1 = 1/(N1 + 2);
-    h2 = 1/(N2 + 2);
+    h1 = 1.0/(N1 + 2);
+    h2 = 1.0/(N2 + 2);
     double *m;
-    m = (double *) calloc((N1+2)*(N2+2), sizeof(double));
+    m = (double *) malloc((N1+2)*(N2+2)*sizeof(double));
     printf("N1 = %d, N2 = %d\n"
             "h1 = %lf, h2 = %lf\n", N1, N2, h1, h2);
     geraMatriz(m, N1, N2);
