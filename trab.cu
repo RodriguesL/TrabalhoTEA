@@ -86,10 +86,10 @@ void gauss_seidel_local_seq(double *atual, int N1, int N2) {
     for (int k = 0; k < ITER; k++) {
         for (int i = 1; i < (N1 - 1); i++) {
             for (int j = 1; j < (N2 - 1); j++) {
-                double ro = 2*(sqrt(e(i,j)*o(i,j))*cos(h1*PI)+sqrt(s(i,j)*n(i,j))*cos(h2*PI));
+                double ro = 2*((sqrt(e(i,j)*o(i,j))*cos(h1*PI)) + (sqrt(s(i,j)*n(i,j))*cos(h2*PI)));
                 double omega = 2/(1 + sqrt(1 - ro*ro));
-                atual[i*N1 + j] = (1 - omega)*atual[i*N1 + j] + omega*(o(i,j)*atual[(i - 1)*N1 + j]+ e(i,j)*atual[(i+1)*N1 + j] +
-                n(i,j)*atual[i*N1 + (j + 1)] + s(i,j)*atual[i*N1 + (j - 1)]);
+                atual[i*N1 + j] = (1 - omega)*atual[i*N1 + j] + omega*(o(i,j)*atual[(i-1)*N1 + j] +
+                        e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
             }
         }
     }
@@ -119,12 +119,11 @@ int main (int argc, char** argv) {
     printf("N1 = %d, N2 = %d\n"
             "h1 = %lf, h2 = %lf\n", N1, N2, h1, h2);
     geraMatriz(m, N1, N2);
-    imprimeMatriz(m, N1, N2);
-    printf("\n\n\n\n");
     gauss_seidel_seq(m, N1, N2, 1);
     imprimeMatriz(m, N1, N2);
     printf("\n\n\n\n");
     memset(m, '\0', N1*N2* sizeof(double));
+    geraMatriz(m, N1, N2);
     gauss_seidel_local_seq(m, N1, N2);
     imprimeMatriz(m, N1, N2);
 
