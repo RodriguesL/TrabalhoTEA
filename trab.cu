@@ -27,17 +27,18 @@ int N2;
 double h1;
 double h2;
 
-double a(double x, double y);
 
-double b(double x, double y);
+__host__ __device__ double a(double x, double y);
 
-double o (int i, int j);
+__host__ __device__ double b(double x, double y);
 
-double n (int i, int j);
+__host__ __device__ double o (int i, int j);
 
-double e (int i, int j);
+__host__ __device__ double n (int i, int j);
 
-double s (int i, int j);
+__host__ __device__ double e (int i, int j);
+
+__host__ __device__ double s (int i, int j);
 
 
 void geraMatriz(double *matriz, int N1, int N2);
@@ -132,28 +133,28 @@ void geraMatriz(double *matriz, int N1, int N2) {
     }
 }
 
-double n (int i, int j) {
+__host__ __device__ double n (int i, int j) {
     return (2 - h2*b(i*h1, j*h2))/(4*(1 + ((h2*h2)/(h1*h1))));
 }
 
-double s (int i, int j) {
+__host__ __device__ double s (int i, int j) {
     return (2 + h2*b(i*h1, j*h2))/(4*(1 + ((h2*h2)/(h1*h1))));
 }
 
-double e (int i, int j) {
+__host__ __device__ double e (int i, int j) {
     return (2 - h1*a(i*h1, j*h2))/(4*(1 + ((h1*h1)/(h2*h2))));
 }
 
-double o (int i, int j){
+__host__ __device__ double o (int i, int j){
     return (2 + h1*a(i*h1, j*h2))/(4*(1 + ((h1*h1)/(h2*h2))));
 }
 
-double b(double x, double y) {
+__host__ __device__ double b(double x, double y) {
     return 500*y*(1 - y)*(x - 0.5);
 }
 
 
-double a(double x, double y) {
+__host__ __device__ double a(double x, double y) {
     return 500*x*(1 - x)*(0.5 - y);
 }
 
