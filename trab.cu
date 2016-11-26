@@ -27,28 +27,15 @@ int N2;
 __constant__ double h1;
 __constant__ double h2;
 
-
-__host__ __device__ double a(double x, double y);
-
-__host__ __device__ double b(double x, double y);
-
-__host__ __device__ double o (int i, int j);
-
-__host__ __device__ double n (int i, int j);
-
-__host__ __device__ double e (int i, int j);
-
-__host__ __device__ double s (int i, int j);
-
+__device__  double a(double x, double y);
+__device__  double b(double x, double y);
+__device__  double o (int i, int j);
+__device__  double n (int i, int j);
+__device__  double e (int i, int j);
+__device__  double s (int i, int j);
 
 void geraMatriz(double *matriz, int N1, int N2);
-
-void gauss_seidel_seq(double* atual, int N1, int N2, double w);
-
-void gauss_seidel_local_seq(double *atual, int N1, int N2);
-
 void imprimeMatriz(double *a, int N1, int N2);
-
 void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2);
 
 __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w);
@@ -73,17 +60,6 @@ int main (int argc, char** argv) {
     int matriz_bytes = N1*N2* sizeof(double);
     matriz = (double *) malloc(matriz_bytes);
     matriz_gpu_volta = (double *) malloc(matriz_bytes);
-    printf("N1 = %d, N2 = %d\n"
-            "h1 = %lf, h2 = %lf\n", N1, N2, h1, h2);
-    geraMatriz(matriz, N1, N2);
-    gauss_seidel_seq(matriz, N1, N2, w);
-    imprimeMatriz(matriz, N1, N2);
-    printf("\n\n\n\n");
-    memset(matriz, '\0', N1*N2* sizeof(double));
-    geraMatriz(matriz, N1, N2);
-    gauss_seidel_local_seq(matriz, N1, N2);
-    imprimeMatriz(matriz, N1, N2);
-    memset(matriz, '\0', N1*N2* sizeof(double));
     geraMatriz(matriz, N1, N2);
     CUDA_SAFE_CALL(cudaMalloc((void**) &matriz_gpu, matriz_bytes));
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
@@ -97,9 +73,6 @@ int main (int argc, char** argv) {
     return 0;
 }
 
-
-
-
 void imprimeMatriz(double *a, int N1, int N2) {
     int i, j;
     for (i = 0 ; i < N1; i++) {
@@ -107,30 +80,6 @@ void imprimeMatriz(double *a, int N1, int N2) {
             printf("%.2lf ", a[i*N1+j]);
         }
         printf("\n");
-    }
-}
-
-void gauss_seidel_local_seq(double *atual, int N1, int N2) {
-    for (int k = 0; k < ITER; k++) {
-        for (int i = 1; i < (N1 - 1); i++) {
-            for (int j = 1; j < (N2 - 1); j++) {
-                double ro = 2*((sqrt(e(i,j)*o(i,j))*cos(h1*PI)) + (sqrt(s(i,j)*n(i,j))*cos(h2*PI)));
-                double omega = 2/(1 + sqrt(1 - ro*ro));
-                atual[i*N1 + j] = (1 - omega)*atual[i*N1 + j] + omega*(o(i,j)*atual[(i-1)*N1 + j] +
-                        e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
-            }
-        }
-    }
-}
-
-void gauss_seidel_seq(double* atual, int N1, int N2, double w) {
-    for (int k = 0; k < ITER; k++) {
-        for (int i = 1; i < (N1-1); i++) {
-            for (int j = 1; j < (N2-1); j++) {
-                    atual[i*N1 + j] = (1 - w)*atual[i*N1 + j] + w*(o(i,j)*atual[(i-1)*N1 + j] +
-                            e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
-            }
-        }
     }
 }
 
@@ -154,28 +103,28 @@ void geraMatriz(double *matriz, int N1, int N2) {
     }
 }
 
-__host__ __device__ double n (int i, int j) {
+__device__ double n (int i, int j) {
     return (2 - h2*b(i*h1, j*h2))/(4*(1 + ((h2*h2)/(h1*h1))));
 }
 
-__host__ __device__ double s (int i, int j) {
+__device__ double s (int i, int j) {
     return (2 + h2*b(i*h1, j*h2))/(4*(1 + ((h2*h2)/(h1*h1))));
 }
 
-__host__ __device__ double e (int i, int j) {
+__device__ double e (int i, int j) {
     return (2 - h1*a(i*h1, j*h2))/(4*(1 + ((h1*h1)/(h2*h2))));
 }
 
-__host__ __device__ double o (int i, int j){
+__device__  double o (int i, int j){
     return (2 + h1*a(i*h1, j*h2))/(4*(1 + ((h1*h1)/(h2*h2))));
 }
 
-__host__ __device__ double b(double x, double y) {
+__device__  double b(double x, double y) {
     return 500*y*(1 - y)*(x - 0.5);
 }
 
 
-__host__ __device__ double a(double x, double y) {
+__device__  double a(double x, double y) {
     return 500*x*(1 - x)*(0.5 - y);
 }
 
