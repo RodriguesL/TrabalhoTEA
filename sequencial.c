@@ -38,6 +38,7 @@ int main (int argc, char** argv) {
     h2 = 1/(N2 + 1);
     double *matriz, *matriz_local;
     matriz = (double *)malloc(N1*N2*sizeof(double));
+    matriz_local = (double *)malloc(N1*N2*sizeof(double));
     geraMatriz(matriz, N1, N2);
     geraMatriz(matriz_local, N1, N2);
     gauss_seidel_seq(matriz, N1, N2, w);
@@ -124,5 +125,15 @@ void gauss_seidel_seq(double* atual, int N1, int N2, double w) {
                                                                e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
             }
         }
+    }
+}
+
+void imprimeMatriz(double *a, int N1, int N2) {
+    int i, j;
+    for (i = 0 ; i < N1; i++) {
+        for (j = 0; j < N2; j++) {
+            printf("%.2lf ", a[i*N1+j]);
+        }
+        printf("\n");
     }
 }

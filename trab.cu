@@ -51,8 +51,8 @@ int main (int argc, char** argv) {
     double w = atof(argv[3]);
     double temp_h1 = 1.0/(N1 - 1);
     double temp_h2 = 1.0/(N2 - 1);
-    cudaMemcpyToSymbol(h1,&temp_h1, sizeof(double));
-    cudaMemcpyToSymbol(h2,&temp_h2, sizeof(double));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(h1,&temp_h1, sizeof(double)));
+    CUDA_SAFE_CALL(cudaMemcpyToSymbol(h2,&temp_h2, sizeof(double)));
 
     dim3 threadsBloco(TAM_BLOCO, TAM_BLOCO);
     dim3 blocosGrade(N1/threadsBloco.x, N2/threadsBloco.y);
@@ -139,16 +139,19 @@ __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w) {
     extern __shared__ double mat_sub[];
 //mem´oria compartilhada para a submatriz de A
     double* Asub = (double*) mat_sub;
+    if ((i != 0 && i != N1) && (j != 0 && j != N2)) {
+        for (int passo = 0; passo < N2; passo += blockDim.y) {
+            Asub[i_bloco * blockDim.y + j_bloco] =
+                    atual[i * N1 + passo + j_bloco];
+            __syncthreads();
+        }
+        if (((i + j) % 2) == 0) {
+            atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                                   e(i, j) * atual[(i + 1) * N1 + j] +
+                                                                   s(i, j) * atual[i * N1 + (j - 1)] +
+                                                                   n(i, j) * atual[i * N1 + (j + 1)]);
 
-    for(int passo=0; passo<N2; passo+=blockDim.y) {
-        Asub[i_bloco*blockDim.y+j_bloco] =
-                atual[i*N1+passo+j_bloco];
-        __syncthreads();
-    }
-    if (((i + j) % 2) == 0) {
-        atual[i*N1 + j] = (1 - w)*atual[i*N1 + j] + w*(o(i,j)*atual[(i-1)*N1 + j] +
-                e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
-
+        }
     }
 }
 
@@ -163,18 +166,19 @@ __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w) 
     extern __shared__ double mat_sub[];
 //mem´oria compartilhada para a submatriz de A
     double *Asub = (double *) mat_sub;
+    if ((i != 0 && i != N1) && (j != 0 && j != N2)) {
+        for (int passo = 0; passo < N2; passo += blockDim.y) {
+            Asub[i_bloco * blockDim.y + j_bloco] =
+                    atual[i * N1 + passo + j_bloco];
+            __syncthreads();
+        }
+        if (((i + j) % 2) == 1) {
+            atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                                   e(i, j) * atual[(i + 1) * N1 + j] +
+                                                                   s(i, j) * atual[i * N1 + (j - 1)] +
+                                                                   n(i, j) * atual[i * N1 + (j + 1)]);
 
-    for (int passo = 0; passo < N2; passo += blockDim.y) {
-        Asub[i_bloco * blockDim.y + j_bloco] =
-                atual[i * N1 + passo + j_bloco];
-        __syncthreads();
-    }
-    if (((i + j) % 2) == 1) {
-        atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
-                                                               e(i, j) * atual[(i + 1) * N1 + j] +
-                                                               s(i, j) * atual[i * N1 + (j - 1)] +
-                                                               n(i, j) * atual[i * N1 + (j + 1)]);
-
+        }
     }
 }
 
