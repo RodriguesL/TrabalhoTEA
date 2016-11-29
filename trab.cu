@@ -7,11 +7,11 @@
 
 //Checagem de erros para as funções do CUDA
 #define CUDA_SAFE_CALL(call) { \
-	cudaError_t err = call;     \
-	if(err != cudaSuccess) {    \
-		fprintf(stderr,"Erro no arquivo '%s', linha %i: %s.\n", \
-			__FILE__, __LINE__,cudaGetErrorString(err)); \
-		exit(EXIT_FAILURE); } }
+    cudaError_t err = call;     \
+    if(err != cudaSuccess) {    \
+        fprintf(stderr,"Erro no arquivo '%s', linha %i: %s.\n", \
+            __FILE__, __LINE__,cudaGetErrorString(err)); \
+        exit(EXIT_FAILURE); } }
 
 #define TAM_BLOCO 32
 #define ITER 1000
@@ -28,33 +28,28 @@ __constant__ double h1;
 __constant__ double h2;
 
 
-__host__ __device__ double a(double x, double y);
+__device__ double a(double x, double y);
 
-__host__ __device__ double b(double x, double y);
+__device__ double b(double x, double y);
 
-__host__ __device__ double o (int i, int j);
+__device__ double o(int i, int j);
 
-__host__ __device__ double n (int i, int j);
+__device__ double n(int i, int j);
 
-__host__ __device__ double e (int i, int j);
+__device__ double e(int i, int j);
 
-__host__ __device__ double s (int i, int j);
+__device__ double s(int i, int j);
 
 
 void geraMatriz(double *matriz, int N1, int N2);
 
-void gauss_seidel_seq(double* atual, int N1, int N2, double w);
-
-void gauss_seidel_local_seq(double *atual, int N1, int N2);
-
 void imprimeMatriz(double *a, int N1, int N2);
 
-void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2);
-
 __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w);
+
 __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w);
 
-int main (int argc, char** argv) {
+int main(int argc, char **argv) {
     if (argc < 4) {
         printf("Digite: %s <N1> <N2> <w>\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -62,35 +57,25 @@ int main (int argc, char** argv) {
     N1 = atoi(argv[1]);
     N2 = atoi(argv[2]);
     double w = atof(argv[3]);
-    double temp_h1 = 1.0/(N1 - 1);
-    double temp_h2 = 1.0/(N2 - 1);
-    cudaMemcpyToSymbol(h1,&temp_h1, sizeof(double));
-    cudaMemcpyToSymbol(h2,&temp_h2, sizeof(double));
+    double temp_h1 = 1.0 / (N1 - 1);
+    double temp_h2 = 1.0 / (N2 - 1);
+    cudaMemcpyToSymbol(h1, &temp_h1, sizeof(double));
+    cudaMemcpyToSymbol(h2, &temp_h2, sizeof(double));
 
     dim3 threadsBloco(TAM_BLOCO, TAM_BLOCO);
-    dim3 blocosGrade(N1/threadsBloco.x, N2/threadsBloco.y);
+    dim3 blocosGrade(N1 / threadsBloco.x, N2 / threadsBloco.y);
     double *matriz, *matriz_gpu, *matriz_gpu_volta;
-    int matriz_bytes = N1*N2* sizeof(double);
+    int matriz_bytes = N1 * N2 * sizeof(double);
     matriz = (double *) malloc(matriz_bytes);
     matriz_gpu_volta = (double *) malloc(matriz_bytes);
-    printf("N1 = %d, N2 = %d\n"
-            "h1 = %lf, h2 = %lf\n", N1, N2, h1, h2);
+
     geraMatriz(matriz, N1, N2);
-    gauss_seidel_seq(matriz, N1, N2, w);
-    imprimeMatriz(matriz, N1, N2);
-    printf("\n\n\n\n");
-    memset(matriz, '\0', N1*N2* sizeof(double));
-    geraMatriz(matriz, N1, N2);
-    gauss_seidel_local_seq(matriz, N1, N2);
-    imprimeMatriz(matriz, N1, N2);
-    memset(matriz, '\0', N1*N2* sizeof(double));
-    geraMatriz(matriz, N1, N2);
-    CUDA_SAFE_CALL(cudaMalloc((void**) &matriz_gpu, matriz_bytes));
+    CUDA_SAFE_CALL(cudaMalloc((void **) &matriz_gpu, matriz_bytes));
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
-    int tamMemoriaComp = 2*TAM_BLOCO*TAM_BLOCO* sizeof(double);
+    int tamMemoriaComp = 2 * TAM_BLOCO * TAM_BLOCO * sizeof(double);
     for (int k = 0; k < ITER; k++) {
-        gauss_seidel_gpu_par<<<blocosGrade, threadsBloco, tamMemoriaComp>>>(matriz_gpu, N1, N2, w);
-        gauss_seidel_gpu_impar<<<blocosGrade, threadsBloco, tamMemoriaComp>>>(matriz_gpu, N1, N2, w);
+        gauss_seidel_gpu_par << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
+        gauss_seidel_gpu_impar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
     }
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu_volta, matriz_gpu, matriz_bytes, cudaMemcpyDeviceToHost));
     imprimeMatriz(matriz_gpu_volta, N1, N2);
@@ -98,85 +83,60 @@ int main (int argc, char** argv) {
 }
 
 
-
-
 void imprimeMatriz(double *a, int N1, int N2) {
     int i, j;
-    for (i = 0 ; i < N1; i++) {
+    for (i = 0; i < N1; i++) {
         for (j = 0; j < N2; j++) {
-            printf("%.2lf ", a[i*N1+j]);
+            printf("%.5lf ", a[i * N1 + j]);
         }
         printf("\n");
     }
 }
 
-void gauss_seidel_local_seq(double *atual, int N1, int N2) {
-    for (int k = 0; k < ITER; k++) {
-        for (int i = 1; i < (N1 - 1); i++) {
-            for (int j = 1; j < (N2 - 1); j++) {
-                double ro = 2*((sqrt(e(i,j)*o(i,j))*cos(h1*PI)) + (sqrt(s(i,j)*n(i,j))*cos(h2*PI)));
-                double omega = 2/(1 + sqrt(1 - ro*ro));
-                atual[i*N1 + j] = (1 - omega)*atual[i*N1 + j] + omega*(o(i,j)*atual[(i-1)*N1 + j] +
-                        e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
-            }
-        }
-    }
-}
-
-void gauss_seidel_seq(double* atual, int N1, int N2, double w) {
-    for (int k = 0; k < ITER; k++) {
-        for (int i = 1; i < (N1-1); i++) {
-            for (int j = 1; j < (N2-1); j++) {
-                    atual[i*N1 + j] = (1 - w)*atual[i*N1 + j] + w*(o(i,j)*atual[(i-1)*N1 + j] +
-                            e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
-            }
-        }
-    }
-}
 
 void geraMatriz(double *matriz, int N1, int N2) {
-    for (int j = 1; j < N1-1 ; j++) {
+    for (int j = 1; j < N1 - 1; j++) {
         matriz[j] = US; // GERANDO CONTORNO PLACA INFERIOR
-        matriz[(N1-1)*(N1) + j] = UN; // GERANDO CONTORNO PLACA TOPO
+        matriz[(N1 - 1) * (N1) + j] = UN; // GERANDO CONTORNO PLACA TOPO
     }
 
-    for (int i = 1; i < N2-1 ; i++) {
-        matriz[i*(N1)] = UO; // GERANDO CONTORNO PLACA ESQUERDA
-        matriz[i*(N1) + N2-1] = UE; // GERANDO CONTORNO PLACA DIREITA
+    for (int i = 1; i < N2 - 1; i++) {
+        matriz[i * (N1)] = UO; // GERANDO CONTORNO PLACA ESQUERDA
+        matriz[i * (N1) + N2 - 1] = UE; // GERANDO CONTORNO PLACA DIREITA
     }
 
 
     //Resto do chute inicial vai ser o proprio lixo de memoria? Ainda pensar sobre...
-    for (int i=1;i<N1-1;i++) {
-        for(int j=1;j<N2-1;j++) {
-            matriz[i*N1 + j] = (double)(UO+UE+US+UN)/4.0;
+    for (int i = 1; i < N1 - 1; i++) {
+        for (int j = 1; j < N2 - 1; j++) {
+            matriz[i * N1 + j] = (double) (UO + UE + US + UN) / 4.0;
         }
     }
 }
 
-__host__ __device__ double n (int i, int j) {
-    return (2 - h2*b(i*h1, j*h2))/(4*(1 + ((h2*h2)/(h1*h1))));
+__device__ double n(int i, int j) {
+    return (2 - h2 * b(i * h1, j * h2)) / (4 * (1 + ((h2 * h2) / (h1 * h1))));
 }
 
-__host__ __device__ double s (int i, int j) {
-    return (2 + h2*b(i*h1, j*h2))/(4*(1 + ((h2*h2)/(h1*h1))));
+__device__ double s(int i, int j) {
+    return (2 + h2 * b(i * h1, j * h2)) / (4 * (1 + ((h2 * h2) / (h1 * h1))));
 }
 
-__host__ __device__ double e (int i, int j) {
-    return (2 - h1*a(i*h1, j*h2))/(4*(1 + ((h1*h1)/(h2*h2))));
+__device__ double e(int i, int j) {
+    return (2 - h1 * a(i * h1, j * h2)) / (4 * (1 + ((h1 * h1) / (h2 * h2))));
 }
 
-__host__ __device__ double o (int i, int j){
-    return (2 + h1*a(i*h1, j*h2))/(4*(1 + ((h1*h1)/(h2*h2))));
+__device__ double o(int i, int j) {
+    return (2 + h1 * a(i * h1, j * h2)) / (4 * (1 + ((h1 * h1) / (h2 * h2))));
 }
 
-__host__ __device__ double b(double x, double y) {
-    return 500*y*(1 - y)*(x - 0.5);
+__device__ double b(double x, double y) {
+    return 500 * y * (1 - y) * (x - 0.5);
 }
 
 
-__host__ __device__ double a(double x, double y) {
-    return 500*x*(1 - x)*(0.5 - y);
+__device__ double a(double x, double y) {
+    return 500 * x * (1 - x) * (0.5 - y);
 }
 
 __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w) {
@@ -189,16 +149,18 @@ __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w) {
     int j_bloco = threadIdx.y;
     extern __shared__ double mat_sub[];
 //mem´oria compartilhada para a submatriz de A
-    double* Asub = (double*) mat_sub;
+    double *Asub = (double *) mat_sub;
 
-    for(int passo=0; passo<N2; passo+=blockDim.y) {
-        Asub[i_bloco*blockDim.y+j_bloco] =
-                atual[i*N1+passo+j_bloco];
+    for (int passo = 0; passo < N2; passo += blockDim.y) {
+        Asub[i_bloco * blockDim.y + j_bloco] =
+                atual[i * N1 + passo + j_bloco];
         __syncthreads();
     }
-    if (((i + j) % 2) == 0) {
-        atual[i*N1 + j] = (1 - w)*atual[i*N1 + j] + w*(o(i,j)*atual[(i-1)*N1 + j] +
-                e(i,j)*atual[(i+1)*N1 + j] + s(i,j)*atual[i*N1 + (j - 1)] + n(i,j)*atual[i*N1 + (j+1)]);
+    if ((((i + j) % 2) == 0) && i != 0 && j != 0 && i != N1 && j != N2) {
+        atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                               e(i, j) * atual[(i + 1) * N1 + j] +
+                                                               s(i, j) * atual[i * N1 + (j - 1)] +
+                                                               n(i, j) * atual[i * N1 + (j + 1)]);
 
     }
 }
@@ -220,7 +182,7 @@ __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w) 
                 atual[i * N1 + passo + j_bloco];
         __syncthreads();
     }
-    if (((i + j) % 2) == 1) {
+    if ((((i + j) % 2) == 1) && i != 0 && j != 0 && i != N1 && j != N2) {
         atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
                                                                e(i, j) * atual[(i + 1) * N1 + j] +
                                                                s(i, j) * atual[i * N1 + (j - 1)] +
@@ -229,11 +191,3 @@ __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w) 
     }
 }
 
-void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2) {
-    for (int i = 0; i < N1*N2; i++) {
-        if (abs(resultado_gpu[i] - resultado[i]) > 1e-5) {
-            fprintf(stderr, "Resultado incorreto para o elemento de indice %d!\n", i);
-            exit(EXIT_FAILURE);
-        }
-    }
-}
