@@ -50,9 +50,18 @@ void geraMatriz(double *matriz, int N1, int N2);
 
 void imprimeMatriz(double *a, int N1, int N2);
 
+void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2);
+
+__global__ void gauss_seidel_gpu(double *atual, int N1, int N2, double w);
+
 __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w);
 
 __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w);
+
+__global__ void gauss_seidel_local_gpu_par(double *atual, int N1, int N2);
+
+__global__ void gauss_seidel_local_gpu_impar(double *atual, int N1, int N2);
+
 
 __global__ void gauss_seidel_gpu_par_shar(double *atual, int N1, int N2, double w);
 
@@ -96,12 +105,25 @@ int main(int argc, char **argv) {
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
 
     for (int k = 0; k < ITER; k++) {
-        gauss_seidel_gpu_par_shar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
-        gauss_seidel_gpu_impar_shar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
+        gauss_seidel_local_gpu_par << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2);
+        gauss_seidel_local_gpu_impar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2);
     }
+
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu_volta, matriz_gpu, matriz_bytes, cudaMemcpyDeviceToHost));
-    imprimeMatriz(matriz_gpu_volta, N1, N2);
+
+
+
+
     return 0;
+}
+
+void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2) {
+    for (int i = 0; i < N1 * N2; i++) {
+        if (abs(resultado_gpu[i] - resultado[i]) > 1e-5) {
+            fprintf(stderr, "Resultado incorrento para o elemento de indice %d!\n", i);
+            //exit(EXIT_FAILURE);
+        }
+    }
 }
 
 void imprimeMatriz(double *a, int N1, int N2) {
@@ -159,13 +181,17 @@ __device__ double a(double x, double y) {
     return 500 * x * (1 - x) * (0.5 - y);
 }
 
+__device__ double ro (int i, int j){
+    return 2*((sqrt(e(i,j)*o(i,j))*cos(h1*PI)) + (sqrt(s(i,j)*n(i,j))*cos(h2*PI)));
+}
+
 __global__ void gauss_seidel_gpu_par(double *atual, int N1, int N2, double w) {
 
     //coordenadas globais da thread
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
-    
-    if ((((i + j) % 2) == 0) && i != 0 && j != 0 && i != (N1-1) && j != (N2-1)) {
+
+    if ((((i + j) % 2) == 0) && i != 0 && j != 0 && i != (N1 - 1) && j != (N2 - 1)) {
         atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
                                                                e(i, j) * atual[(i + 1) * N1 + j] +
                                                                s(i, j) * atual[i * N1 + (j - 1)] +
@@ -182,7 +208,7 @@ __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w) 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if ((((i + j) % 2) == 1) && i != 0 && j != 0 && i != (N1-1) && j != (N2-1)) {
+    if ((((i + j) % 2) == 1) && i != 0 && j != 0 && i != (N1 - 1) && j != (N2 - 1)) {
         atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
                                                                e(i, j) * atual[(i + 1) * N1 + j] +
                                                                s(i, j) * atual[i * N1 + (j - 1)] +
@@ -190,6 +216,31 @@ __global__ void gauss_seidel_gpu_impar(double *atual, int N1, int N2, double w) 
 
     }
 }
+
+__global__ void gauss_seidel_gpu(double *atual, int N1, int N2, double w) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    if (i != 0 && j != 0 && i != (N1 - 1) && j != (N2 - 1)) {
+        if (((i + j) % 2) == 0) {
+            atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                                   e(i, j) * atual[(i + 1) * N1 + j] +
+                                                                   s(i, j) * atual[i * N1 + (j - 1)] +
+                                                                   n(i, j) * atual[i * N1 + (j + 1)]);
+        }
+        __syncthreads();
+
+        if (((i + j) % 2) == 1) {
+            atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                                   e(i, j) * atual[(i + 1) * N1 + j] +
+                                                                   s(i, j) * atual[i * N1 + (j - 1)] +
+                                                                   n(i, j) * atual[i * N1 + (j + 1)]);
+        }
+
+
+    }
+
+}
+
 
 __global__ void gauss_seidel_gpu_impar_shar(double *atual, int N1, int N2, double w) {
 
@@ -228,17 +279,47 @@ __global__ void gauss_seidel_gpu_par_shar(double *atual, int N1, int N2, double 
     extern __shared__ double mat_sub[];
 //mem´oria compartilhada para a submatriz de A
     double *Asub = (double *) mat_sub;
-        for (int passo = 0; passo < N2; passo += blockDim.y) {
-            Asub[i_bloco * blockDim.y + j_bloco] =
-                    atual[i * N1 + passo + j_bloco];
-            __syncthreads();
-        }
-        if ((((i + j) % 2) == 0) && i != 0 && j != 0 && i != N1 && j != N2) {
-            atual[i * N1 + j] = (1 - w) * Asub[i * N1 + j] + w * (o(i, j) * Asub[(i - 1) * N1 + j] +
-                                                                  e(i, j) * Asub[(i + 1) * N1 + j] +
-                                                                  s(i, j) * Asub[i * N1 + (j - 1)] +
-                                                                  n(i, j) * Asub[i * N1 + (j + 1)]);
+    for (int passo = 0; passo < N2; passo += blockDim.y) {
+        Asub[i_bloco * blockDim.y + j_bloco] =
+                atual[i * N1 + passo + j_bloco];
+        __syncthreads();
+    }
+    if ((((i + j) % 2) == 0) && i != 0 && j != 0 && i != N1 && j != N2) {
+        atual[i * N1 + j] = (1 - w) * Asub[i * N1 + j] + w * (o(i, j) * Asub[(i - 1) * N1 + j] +
+                                                              e(i, j) * Asub[(i + 1) * N1 + j] +
+                                                              s(i, j) * Asub[i * N1 + (j - 1)] +
+                                                              n(i, j) * Asub[i * N1 + (j + 1)]);
 
-        }
-    
+    }
+
+}
+
+__global__ void gauss_seidel_local_gpu_par(double *atual, int N1, int N2){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((((i + j) % 2) == 0) && i != 0 && j != 0 && i != (N1 - 1) && j != (N2 - 1)) {
+        double p = ro(i,j);
+        double w = 2 / (1 + sqrt(1 - (p*p)));
+        atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                               e(i, j) * atual[(i + 1) * N1 + j] +
+                                                               s(i, j) * atual[i * N1 + (j - 1)] +
+                                                               n(i, j) * atual[i * N1 + (j + 1)]);
+
+    }
+}
+
+__global__ void gauss_seidel_local_gpu_impar(double *atual, int N1, int N2){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if ((((i + j) % 2) == 1) && i != 0 && j != 0 && i != (N1 - 1) && j != (N2 - 1)) {
+        double p = ro(i,j);
+        double w = 2 / (1 + sqrt(1 - (p*p)));
+        atual[i * N1 + j] = (1 - w) * atual[i * N1 + j] + w * (o(i, j) * atual[(i - 1) * N1 + j] +
+                                                               e(i, j) * atual[(i + 1) * N1 + j] +
+                                                               s(i, j) * atual[i * N1 + (j - 1)] +
+                                                               n(i, j) * atual[i * N1 + (j + 1)]);
+
+    }
 }
