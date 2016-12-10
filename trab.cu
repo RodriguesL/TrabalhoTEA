@@ -79,13 +79,15 @@ int main(int argc, char **argv) {
     }
     N1 = atoi(argv[1]);
     N2 = atoi(argv[2]);
+    float tempo_kernel, tempo_kernel_local, tempo_kernel_shared, tempo_kernel_local_shared;
     double w = atof(argv[3]);
+    double inicio, fim, tempo_ida, tempo_volta;
     double temp_h1 = 1.0 / (N1 - 1);
     double temp_h2 = 1.0 / (N2 - 1);
+    cudaEvent_t start, stop;
     CUDA_SAFE_CALL(cudaMemcpyToSymbol(h1, &temp_h1, sizeof(double)));
     CUDA_SAFE_CALL(cudaMemcpyToSymbol(h2, &temp_h2, sizeof(double)));
-    printf("N1 = %d, N2 = %d\n"
-                   "h1 = %lf, h2 = %lf\n", N1, N2, temp_h1, temp_h2);
+
     dim3 threadsBloco(TAM_BLOCO, TAM_BLOCO);
     dim3 blocosGrade(N1 / threadsBloco.x, N2 / threadsBloco.y);
     double *matriz, *matriz_gpu, *matriz_gpu_volta;
@@ -94,23 +96,44 @@ int main(int argc, char **argv) {
     matriz_gpu_volta = (double *) malloc(matriz_bytes);
 
     geraMatriz(matriz, N1, N2);
+    GET_TIME(inicio);
     CUDA_SAFE_CALL(cudaMalloc((void **) &matriz_gpu, matriz_bytes));
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
+    GET_TIME(fim);
+    tempo_ida = fim - inicio;
     int tamMemoriaComp = 2 * TAM_BLOCO * TAM_BLOCO * sizeof(double);
+
+    CUDA_SAFE_CALL(cudaEventCreate(&start));
+    CUDA_SAFE_CALL(cudaEventCreate(&stop));
+    CUDA_SAFE_CALL(cudaEventRecord(start));
     for (int k = 0; k < ITER; k++) {
         gauss_seidel_gpu_par << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
         gauss_seidel_gpu_impar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
     }
-
+    CUDA_SAFE_CALL(cudaGetLastError());
+    CUDA_SAFE_CALL(cudaEventRecord(stop)); // Lembra o tempo de fim
+    CUDA_SAFE_CALL(cudaEventSynchronize(stop));
+    tempo_kernel = 0;
+    CUDA_SAFE_CALL(cudaEventElapsedTime(&tempo_kernel, start, stop));
+    tempo_kernel /= 1000; // (tempo em seg)
 
     memset(matriz, '\0', N1 * N2 * sizeof(double));
     geraMatriz(matriz, N1, N2);
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
 
+    CUDA_SAFE_CALL(cudaEventCreate(&start));
+    CUDA_SAFE_CALL(cudaEventCreate(&stop));
+    CUDA_SAFE_CALL(cudaEventRecord(start));
     for (int k = 0; k < ITER; k++) {
         gauss_seidel_local_gpu_par << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2);
         gauss_seidel_local_gpu_impar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2);
     }
+    CUDA_SAFE_CALL(cudaGetLastError());
+    CUDA_SAFE_CALL(cudaEventRecord(stop)); // Lembra o tempo de fim
+    CUDA_SAFE_CALL(cudaEventSynchronize(stop));
+    tempo_kernel_local = 0;
+    CUDA_SAFE_CALL(cudaEventElapsedTime(&tempo_kernel_local, start, stop));
+    tempo_kernel_local /= 1000; // (tempo em seg)
 
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu_volta, matriz_gpu, matriz_bytes, cudaMemcpyDeviceToHost));
     imprimeMatriz(matriz_gpu_volta, N1, N2);
@@ -119,34 +142,73 @@ int main(int argc, char **argv) {
     geraMatriz(matriz, N1, N2);
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
 
+    CUDA_SAFE_CALL(cudaEventCreate(&start));
+    CUDA_SAFE_CALL(cudaEventCreate(&stop));
+    CUDA_SAFE_CALL(cudaEventRecord(start));
     for (int k = 0; k < ITER; k++) {
         gauss_seidel_gpu_par_shar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
         gauss_seidel_gpu_impar_shar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2, w);
     }
-
-
+    CUDA_SAFE_CALL(cudaGetLastError());
+    CUDA_SAFE_CALL(cudaEventRecord(stop)); // Lembra o tempo de fim
+    CUDA_SAFE_CALL(cudaEventSynchronize(stop));
+    tempo_kernel_shared = 0;
+    CUDA_SAFE_CALL(cudaEventElapsedTime(&tempo_kernel_shared, start, stop));
+    tempo_kernel_shared /= 1000; // (tempo em seg)
 
     memset(matriz, '\0', N1 * N2 * sizeof(double));
     geraMatriz(matriz, N1, N2);
     CUDA_SAFE_CALL(cudaMemcpy(matriz_gpu, matriz, matriz_bytes, cudaMemcpyHostToDevice));
 
+    CUDA_SAFE_CALL(cudaEventCreate(&start));
+    CUDA_SAFE_CALL(cudaEventCreate(&stop));
+    CUDA_SAFE_CALL(cudaEventRecord(start));
     for (int k = 0; k < ITER; k++) {
         gauss_seidel_local_gpu_par_shar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2);
         gauss_seidel_local_gpu_impar_shar << < blocosGrade, threadsBloco, tamMemoriaComp >> > (matriz_gpu, N1, N2);
     }
-
+    CUDA_SAFE_CALL(cudaGetLastError());
+    CUDA_SAFE_CALL(cudaEventRecord(stop)); // Lembra o tempo de fim
+    CUDA_SAFE_CALL(cudaEventSynchronize(stop));
+    tempo_kernel_local_shared = 0;
+    CUDA_SAFE_CALL(cudaEventElapsedTime(&tempo_kernel_local_shared, start, stop));
+    tempo_kernel_local_shared /= 1000; // (tempo em seg)
 
     double* matriz_teste = (double *) malloc(matriz_bytes);
+    GET_TIME(inicio);
     CUDA_SAFE_CALL(cudaMemcpy(matriz_teste, matriz_gpu, matriz_bytes, cudaMemcpyDeviceToHost));
-
+    GET_TIME(fim);
+    tempo_volta = fim - inicio;
     printf("\n\n\n\n\n\n\n\n\n\n");
     imprimeMatriz(matriz_teste, N1, N2);
-
     testaResultado(matriz_gpu_volta, matriz_teste, N1, N2);
 
-
-
-
+    printf(
+            "Matriz de %dx%d\n"
+            "Blocos de %dx%d\n"
+            "Tempo ida = %.6fs\n"
+            "Tempo volta = %.6fs\n"
+            "Tempo kernel = %.6fs\n"
+            "Tempo kernel shared = %.6fs\n"
+            "Tempo kernel local = %.6fs\n"
+            "Tempo kernel local shared = %.6fs\n"
+            "Tempo total de GPU = %.6fs\n"
+            "Tempo total de GPU shared = %.6fs\n"
+            "Tempo total de GPU local = %.6fs\n"
+            "Tempo total de GPU local shared = %.6fs\n",
+            N1, N2,
+            threadsBloco.x, threadsBloco.y,
+            tempo_ida,
+            tempo_volta,
+            tempo_kernel,
+            tempo_kernel_shared,
+            tempo_kernel_local,
+            tempo_kernel_local_shared,
+            tempo_ida+tempo_kernel+tempo_volta,
+            tempo_ida+tempo_kernel_shared+tempo_volta,
+            tempo_ida+tempo_kernel_local+tempo_volta,
+            tempo_ida+tempo_kernel_local_shared+tempo_volta
+    );
 
     return 0;
 }
@@ -154,7 +216,7 @@ int main(int argc, char **argv) {
 void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2) {
     for (int i = 0; i < N1 * N2; i++) {
         if (abs(resultado_gpu[i] - resultado[i]) > 1e-1) {
-            printf("Resultado incorrento para o elemento de indice %d!\n", i);
+            printf("Resultado incorreto para o elemento de indice %d!\n", i);
             //exit(EXIT_FAILURE);
         }
     }

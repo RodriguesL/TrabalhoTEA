@@ -59,12 +59,18 @@ int main (int argc, char** argv) {
     printf("N1 = %d, N2 = %d\n"
                    "h1 = %lf, h2 = %lf\n", N1, N2, h1, h2);
     geraMatriz(matriz, N1, N2);
+    GET_TIME(inicio);
     gauss_seidel_seq(matriz, N1, N2, w);
+    GET_TIME(fim);
+    tempo_seq = fim - inicio;
     imprimeMatriz(matriz, N1, N2);
     printf("\n\n\n\n");
     memset(matriz, '\0', N1*N2* sizeof(double));
     geraMatriz(matriz, N1, N2);
+    GET_TIME(inicio);
     gauss_seidel_local_seq(matriz, N1, N2);
+    GET_TIME(fim);
+    tempo_seq_local = fim - inicio;
     imprimeMatriz(matriz, N1, N2);
     memset(matriz, '\0', N1*N2* sizeof(double));
 }
