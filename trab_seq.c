@@ -5,7 +5,7 @@
 #include <string.h>
 #include "clock_timer.h"
 
-#define ITER 1000
+#define ITER 5000
 #define UO 0
 #define UE 10
 #define UN 5
@@ -49,6 +49,7 @@ int main (int argc, char** argv) {
     N1 = atoi(argv[1]);
     N2 = atoi(argv[2]);
     double w = atof(argv[3]);
+    double inicio, fim, tempo_seq, tempo_seq_local;
     h1 = 1.0/(N1 - 1);
     h2 = 1.0/(N2 - 1);
 
@@ -56,8 +57,6 @@ int main (int argc, char** argv) {
     int matriz_bytes = N1*N2* sizeof(double);
     matriz = (double *) malloc(matriz_bytes);
 
-    printf("N1 = %d, N2 = %d\n"
-                   "h1 = %lf, h2 = %lf\n", N1, N2, h1, h2);
     geraMatriz(matriz, N1, N2);
     GET_TIME(inicio);
     gauss_seidel_seq(matriz, N1, N2, w);
@@ -73,6 +72,13 @@ int main (int argc, char** argv) {
     tempo_seq_local = fim - inicio;
     imprimeMatriz(matriz, N1, N2);
     memset(matriz, '\0', N1*N2* sizeof(double));
+
+    printf(
+            "Tempo sequencial = %.6fs\n"
+            "Tempo sequencial local = %.6fs\n",
+            tempo_seq,
+            tempo_seq_local
+    );
 }
 
 

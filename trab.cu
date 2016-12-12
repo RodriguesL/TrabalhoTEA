@@ -14,7 +14,7 @@
         exit(EXIT_FAILURE); } }
 
 #define TAM_BLOCO 32
-#define ITER 1000
+#define ITER 5000
 #define UO 0
 #define UE 10
 #define UN 5
@@ -217,7 +217,7 @@ void testaResultado(double *resultado_gpu, double *resultado, int N1, int N2) {
     for (int i = 0; i < N1 * N2; i++) {
         if (abs(resultado_gpu[i] - resultado[i]) > 1e-1) {
             printf("Resultado incorreto para o elemento de indice %d!\n", i);
-            //exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE);
         }
     }
 }
@@ -325,20 +325,16 @@ __global__ void gauss_seidel_gpu_impar_shar(double *atual, int N1, int N2, doubl
     __shared__ double Asub[TAM_BLOCO+2][TAM_BLOCO+2];
 
 
-    //for (int passo = 0; passo < N2; passo += TAM_BLOCO) {
     Asub[i_bloco][ j_bloco] = atual[i * N1 + j];
-
-    if(i_bloco == 1) Asub[i_bloco - 1 ][ j_bloco] = atual[(i-1) * N1 + j];
-    if(i_bloco == TAM_BLOCO) Asub[i_bloco + 1 ][ j_bloco] = atual[(i+1) * N1 + j];
-    if(j_bloco == 1) Asub[i_bloco ][ j_bloco - 1] = atual[i * N1 + j - 1 ];
-    if(j_bloco == TAM_BLOCO) Asub[i_bloco ][ j_bloco + 1] = atual[i * N1 + j + 1 ];
-
+    if (i_bloco == 1) Asub[i_bloco - 1][j_bloco] = atual[(i - 1) * N1 + j];
+    if (i_bloco == TAM_BLOCO) Asub[i_bloco + 1][j_bloco] = atual[(i + 1) * N1 + j];
+    if (j_bloco == 1) Asub[i_bloco][j_bloco - 1] = atual[i * N1 + j - 1];
+    if (j_bloco == TAM_BLOCO) Asub[i_bloco][j_bloco + 1] = atual[i * N1 + j + 1];
 
 
     __syncthreads();
-    //}
     if ((((i + j) % 2) == 1) && i > 0 && j > 0 && i < (N1 - 1) && j < (N2 - 1) ) {
-        
+
         atual[i * N1 + j] = (1 - w) * Asub[i_bloco][ j_bloco] + w * (o(i, j) * Asub[(i_bloco - 1)][ j_bloco] +
                                                               e(i, j) * Asub[(i_bloco + 1)][ j_bloco] +
                                                               s(i, j) * Asub[i_bloco][(j_bloco - 1)] +
@@ -359,15 +355,13 @@ __global__ void gauss_seidel_gpu_par_shar(double *atual, int N1, int N2, double 
     int j_bloco = threadIdx.y + 1;
 
     __shared__ double Asub[TAM_BLOCO+2][TAM_BLOCO+2];
-
-    Asub[i_bloco][j_bloco] = atual[i * N1 + j];
-    if(i_bloco == 1) Asub[i_bloco - 1 ][ j_bloco] = atual[(i-1) * N1 + j];
-    if(i_bloco == TAM_BLOCO) Asub[i_bloco + 1 ][ j_bloco] = atual[(i+1) * N1 + j];
-    if(j_bloco == 1) Asub[i_bloco ][ j_bloco - 1] = atual[i * N1 + j - 1 ];
-    if(j_bloco == TAM_BLOCO) Asub[i_bloco ][ j_bloco + 1] = atual[i * N1 + j + 1 ];
-
+        Asub[i_bloco][j_bloco] = atual[i * N1 + j];
+        if (i_bloco == 1) Asub[i_bloco - 1][j_bloco] = atual[(i - 1) * N1 + j];
+        if (i_bloco == TAM_BLOCO) Asub[i_bloco + 1][j_bloco] = atual[(i + 1) * N1 + j];
+        if (j_bloco == 1) Asub[i_bloco][j_bloco - 1] = atual[i * N1 + j - 1];
+        if (j_bloco == TAM_BLOCO) Asub[i_bloco][j_bloco + 1] = atual[i * N1 + j + 1];
     __syncthreads();
-    if ((((i + j) % 2) == 0) && i > 0 && j > 0  && i < (N1 - 1) && j < (N2 - 1) ) {
+    if ((((i + j) % 2) == 0) && i > 0 && j > 0  && i < (N1 - 1) && j < (N2 - 1)) {
         atual[i * N1 + j] = (1 - w) * Asub[i_bloco][j_bloco] + w * (o(i, j) * Asub[(i_bloco - 1)][j_bloco] +
                                                               e(i, j) * Asub[(i_bloco + 1) ][ j_bloco] +
                                                               s(i, j) * Asub[i_bloco][(j_bloco - 1)] +
